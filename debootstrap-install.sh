@@ -139,22 +139,25 @@ apt-get install -y debootstrap
 
 debootstrap $WERSJA /mnt
 
+if [ "$WERSJA" != "stable" ]; then
 cat <<EOF > /mnt/etc/apt/sources.list
-deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian-security/ bookworm-security main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian-security/ bookworm-security main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware
 EOF
+else
+cat <<EOF > /mnt/etc/apt/sources.list
+deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware
+
+deb http://deb.debian.org/debian-security/ $WERSJA-security main contrib non-free non-free-firmware
+
+deb http://deb.debian.org/debian $WERSJA-updates main contrib non-free non-free-firmware
+EOF
+fi
 
 for dir in sys dev proc; do
     mount --rbind /$dir /mnt/$dir && mount --make-rslave /mnt/$dir
 done
 
-chroot /mnt /bin/bash -c "apt-get update && apt-get upgrade -y && apt-get install -y linux-image-amd64 grub-efi-amd64 efibootmgr"
+chroot /mnt /bin/bash -c "apt-get update && apt-get upgrade -y && apt-get install -y linux-image-amd64 grub-efi-amd64 efibootmgr sudo"
 chroot /mnt /bin/bash -c "grub-install /dev/${DYSK}1 && update-grub"
 
 # Setting up fstab
@@ -180,9 +183,54 @@ chroot /mnt /bin/bash -c "apt-get install -y locales && echo 'en_US.UTF-8 UTF-8'
 
 # Setting up hostname
 echo "$HOSTNAME" > /mnt/etc/hostname
+cat <<EOF > /mnt/etc/hosts
+127.0.0.1 localhost
+127.0.0.1 $HOSTNAME
+::1 localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+EOF
 
 chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
 
-echo "Installation finished. Change your root password and reboot."
+echo "Installation finished. Change your root password"
 echo "Root password:"
 chroot /mnt /bin/bash -c "passwd"
+
+echo "Do you want to create a new user?"
+while true; do
+    read -p "Create a new user? (yes/no): " USER
+    case $USER in
+        yes)
+            read -p "Enter the username: " USERNAME
+            read -p "Will $USERNAME be a sudo user? (yes/no): " SUDO
+            while true; do
+                case $SUDO in
+                    yes)
+                        chroot /mnt /bin/bash -c "useradd -m -s /bin/bash -G sudo $USERNAME"
+                        break
+                        ;;
+                    no)
+                        chroot /mnt /bin/bash -c "useradd -m -s /bin/bash $USERNAME"
+                        break
+                        ;;
+                    *)
+                        echo "Invalid choice. Please select 'yes' or 'no'."
+                        ;;
+                esac
+            done
+            echo "User password:"
+            chroot /mnt /bin/bash -c "passwd $USERNAME"
+            break
+            ;;
+        no)
+            echo "No user created."
+            break
+            ;;
+        *)
+            echo "Invalid choice. Please select 'yes' or 'no'."
+            ;;
+    esac
+done
+
+echo "Installation finished. You can now reboot your system."

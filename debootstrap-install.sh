@@ -1,15 +1,11 @@
 echo "Debian installation script"
 echo "Works only on UEFI systems, and create only two partitions: EFI and root."
 
-show_menu() {
+while true; do
     echo "What Debian version do you want to install?"
     echo "1. Stable"
     echo "2. Testing"
     echo "3. Sid"
-}
-
-while true; do
-    show_menu
     read -p "Choose your preferred Debian version: " WERSJA
     case $WERSJA in
         1)
@@ -52,9 +48,6 @@ while true; do
     fi
 done
 
-
-
-# Zapytaj o preferowany system plików
 while true; do
     echo "Which filesystem do you want to use?"
     echo "1. ext4"
@@ -69,16 +62,13 @@ while true; do
             break
             ;;
         2)
-            FS=btrfs
-            break
+            echo "Btrfs is not supported by this script yet."
             ;;
         3)
-            FS=xfs
-            break
+            echo "XFS is not supported by this script yet."
             ;;
         4)
-            FS=zfs
-            break
+            echo "ZFS is not supported by this script yet."
             ;;
         *)
             echo "Invalid choice. Please select a valid number."
@@ -86,36 +76,34 @@ while true; do
     esac
 done
 
-read -p "WARNING: This will erase all data on $DYSK. Continue? (yes/no): " confirm
-case $confirm in
-    yes)
-        ;;
-    no)
-        echo "Operation cancelled."
-        exit 1
-        ;;
-    *)
-        echo "Invalid choice. Please select 'yes' or 'no'."
-        ;;
-esac
+while true; do
+    read -p "WARNING: This will erase all data on $DYSK. Continue? (yes/no): " confirm
+    case $confirm in
+        yes)
+            break
+            ;;
+        no)
+            echo "Operation cancelled."
+            exit 1
+            ;;
+        *)
+            echo "Invalid choice. Please select 'yes' or 'no'."
+            ;;
+    esac
+done
 
-# Tworzenie partycji na wybranym dysku
 echo "Creating partitions on $DYSK..."
 
-# Komendy parted
 parted "$DYSK" --script mklabel gpt \
     mkpart boot fat32 1MiB 1001MiB \
     set 1 esp on \
     mkpart primary $FS 1001MiB 100%
 
-# Wyświetlenie informacji o utworzonych partycjach
 echo "Partitions created:"
 lsblk "$DYSK"
 
-# Zmienna 'DYSK' przechowuje teraz pełną nazwę wybranego dysku
 echo "Finished partitioning $DYSK."
 
-# Formatowanie partycji
 echo "Formatting partitions..."
 mkfs.vfat "${DYSK}1"
 mkfs."$FS" "${DYSK}2"
@@ -127,7 +115,6 @@ mount "${DYSK}1" /mnt/boot/efi
 apt-get update && apt-get upgrade -y
 apt-get install -y debootstrap
 
-# Instalacja systemu
 debootstrap $WERSJA /mnt
 
 cat <<EOF > /mnt/etc/apt/sources.list
@@ -148,7 +135,7 @@ done
 chroot /mnt /bin/bash -c "apt-get update && apt-get upgrade -y && apt-get install -y linux-image-amd64 grub-efi-amd64 efibootmgr"
 chroot /mnt /bin/bash -c "grub-install /dev/${DYSK}1 && update-grub"
 
-
+# Setting up fstab
 EFI_UUID=$(blkid -s UUID -o value "${DYSK}1")
 ROOT_UUID=$(blkid -s UUID -o value "${DYSK}2")
 
@@ -156,6 +143,18 @@ cat <<EOF > /mnt/etc/fstab
 UUID=$ROOT_UUID / $FS defaults 0 1
 UUID=$EFI_UUID /boot/efi vfat defaults 0 1
 EOF
+
+# Network configuration
+cat <<EOF > /mnt/etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+auto enp0s1
+iface enp0s1 inet dhcp
+EOF
+
+chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
+
 
 echo "Installation finished. Change your root password and reboot."
 echo "Root password:"

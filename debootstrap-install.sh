@@ -1,5 +1,27 @@
 echo "Debian installation script"
 echo "Works only on UEFI systems, and create only two partitions: EFI and root."
+echo "This script will erase all data on the selected disk."
+
+# Checking if the script is running as root...
+if [ "$EUID" -ne 0 ]; then
+    echo "Please run this script as root."
+    exit 1
+fi
+
+# Checking if the system is running in UEFI mode
+if [ ! -d /sys/firmware/efi ]; then
+    echo "This script works only on UEFI systems."
+    exit 1
+fi
+
+# Checking if the system is connected to the internet
+if ! ping -c 1 google.com &> /dev/null; then
+    echo "No internet connection. Please connect to the internet and run the script again."
+    exit 1
+fi
+
+echo "How do you want to name your computer?"
+read -p "Enter the hostname: " HOSTNAME
 
 while true; do
     echo "What Debian version do you want to install?"
@@ -153,8 +175,13 @@ auto enp0s1
 iface enp0s1 inet dhcp
 EOF
 
-chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
+# Generating locales
+chroot /mnt /bin/bash -c "apt-get install -y locales && echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
 
+# Setting up hostname
+echo "$HOSTNAME" > /mnt/etc/hostname
+
+chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
 
 echo "Installation finished. Change your root password and reboot."
 echo "Root password:"

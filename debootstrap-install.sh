@@ -26,8 +26,8 @@ read -p "Enter the hostname: " HOSTNAME
 while true; do
     echo "What Debian version do you want to install?"
     echo "1. Stable"
-    echo "2. Testing"
-    echo "3. Sid"
+    echo "2. Testing NOT TESTED YET"
+    echo "3. Sid NOT TESTED YET"
     read -p "Choose your preferred Debian version: " WERSJA
     case $WERSJA in
         1)
@@ -181,6 +181,9 @@ EOF
 # Generating locales
 chroot /mnt /bin/bash -c "apt-get install -y locales && echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
 
+# Setting up timezone
+chroot /mnt /bin/bash -c "ln -sf /usr/share/zoneinfo/Europe/Warsaw /etc/localtime"
+
 # Setting up hostname
 echo "$HOSTNAME" > /mnt/etc/hostname
 cat <<EOF > /mnt/etc/hosts
@@ -191,27 +194,30 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
 
+# Installing end enabling DHCP client
 chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
 
-echo "Installation finished. Change your root password"
+echo "Change your root password"
 echo "Root password:"
 chroot /mnt /bin/bash -c "passwd"
 
+# Creating a new user
 echo "Do you want to create a new user?"
 while true; do
     read -p "Create a new user? (yes/no): " USER
     case $USER in
         yes)
+            read -p "Enter the full name of the user: " FULLNAME
             read -p "Enter the username: " USERNAME
+            chroot /mnt /bin/bash -c "useradd -m -G users -s /bin/bash -c \"$FULLNAME\" $USERNAME"
             read -p "Will $USERNAME be a sudo user? (yes/no): " SUDO
             while true; do
                 case $SUDO in
                     yes)
-                        chroot /mnt /bin/bash -c "useradd -m -s /bin/bash -G sudo $USERNAME"
+                        chroot /mnt /bin/bash -c "usermod -aG sudo $USERNAME"
                         break
                         ;;
                     no)
-                        chroot /mnt /bin/bash -c "useradd -m -s /bin/bash $USERNAME"
                         break
                         ;;
                     *)

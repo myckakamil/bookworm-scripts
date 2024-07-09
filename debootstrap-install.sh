@@ -128,7 +128,7 @@ lsblk "$DYSK"
 echo "Finished partitioning $DYSK."
 
 echo "Formatting partitions..."
-mkfs.vfat "${DYSK}1" -f
+mkfs.vfat "${DYSK}1" 
 mkfs."$FS" "${DYSK}2" -f
 
 case $FS in
@@ -258,6 +258,24 @@ while true; do
             done
             echo "User password:"
             chroot /mnt /bin/bash -c "passwd $USERNAME"
+            echo "Do you want to predownload my setup scripts? (yes/no)"
+            while true; do
+                read SCRIPTS
+                case $SCRIPTS in
+                    yes)
+                        chroot /mnt /bin/bash -c "apt-get install -y git"
+                        chroot /mnt /bin/bash -c "git clone https://github.com/Mordimmer/bookwork-scripts /home/$USERNAME/bookwork-scripts"
+                        break
+                        ;;
+                    no)
+                        echo "No scripts downloaded."
+                        break
+                        ;;
+                    *)
+                        echo "Invalid choice. Please select 'yes' or 'no'."
+                        ;;  
+                esac
+            done
             break
             ;;
         no)
@@ -269,5 +287,7 @@ while true; do
             ;;
     esac
 done
+
+
 
 echo "Installation finished. You can now reboot your system."

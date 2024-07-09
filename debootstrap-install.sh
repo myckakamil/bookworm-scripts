@@ -73,7 +73,7 @@ done
 while true; do
     echo "Which filesystem do you want to use?"
     echo "1. ext4"
-    echo "2. btrfs TODO"
+    echo "2. btrfs"
     echo "3. xfs   TODO"
     echo "4. zfs   TODO"
     read -p "Enter the number of your choice: " FS
@@ -84,7 +84,8 @@ while true; do
             break
             ;;
         2)
-            echo "Btrfs is not supported by this script yet."
+            FS=btrfs
+            break
             ;;
         3)
             echo "XFS is not supported by this script yet."
@@ -127,30 +128,49 @@ lsblk "$DYSK"
 echo "Finished partitioning $DYSK."
 
 echo "Formatting partitions..."
-mkfs.vfat "${DYSK}1"
-mkfs."$FS" "${DYSK}2"
+mkfs.vfat "${DYSK}1" -f
+mkfs."$FS" "${DYSK}2" -f
 
-mount "${DYSK}2" /mnt
-mkdir -p /mnt/boot/efi
-mount "${DYSK}1" /mnt/boot/efi
+case $FS in
+    ext4)
+        echo "Mounting partitions..."
+        mount "${DYSK}2" /mnt
+        mkdir -p /mnt/boot/efi
+        mount "${DYSK}1" /mnt/boot/efi
+        ;;
+    btrfs)
+        echo "Creating subvolumes..."
+        mount "${DYSK}2" /mnt
+        btrfs subvolume create /mnt/@
+        btrfs subvolume create /mnt/@home
+        btrfs subvolume create /mnt/@root
+        btrfs subvolume create /mnt/@var
+        btrfs subvolume create /mnt/@tmp
+        btrfs subvolume create /mnt/@snapshots
+
+        echo "Mounting subvolumes..."
+        mount -o noatime,compress=zstd,subvol=@ "$DYSK"2 /mnt
+        mkdir -p /mnt/{home,root,var,tmp,.snapshots}
+        mkdir -p /mnt/boot/efi
+        mount -o noatime,compress=zstd,subvol=@home "$DYSK"2 /mnt/home
+        mount -o noatime,compress=zstd,subvol=@var "$DYSK"2 /mnt/var
+        mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"2 /mnt/tmp
+        mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"2 /mnt/.snapshots
+        mount "${DYSK}"1 /mnt/boot/efi
+        ;;
+    *)
+        ;;
+esac
 
 apt-get update && apt-get upgrade -y
 apt-get install -y debootstrap
 
 debootstrap $WERSJA /mnt
 
+echo "deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware" > /mnt/etc/apt/sources.list
 if [ "$WERSJA" != "stable" ]; then
-cat <<EOF > /mnt/etc/apt/sources.list
-deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware
-EOF
-else
-cat <<EOF > /mnt/etc/apt/sources.list
-deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian-security/ $WERSJA-security main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian $WERSJA-updates main contrib non-free non-free-firmware
-EOF
+    echo "deb http://deb.debian.org/debian-security/ $WERSJA-security main contrib non-free non-free-firmware" >> /mnt/etc/apt/sources.list
+    echo "deb http://deb.debian.org/debian $WERSJA-updates main contrib non-free non-free-firmware" >> /mnt/etc/apt/sources.list
 fi
 
 for dir in sys dev proc; do
@@ -164,10 +184,21 @@ chroot /mnt /bin/bash -c "grub-install /dev/${DYSK}1 && update-grub"
 EFI_UUID=$(blkid -s UUID -o value "${DYSK}1")
 ROOT_UUID=$(blkid -s UUID -o value "${DYSK}2")
 
-cat <<EOF > /mnt/etc/fstab
-UUID=$ROOT_UUID / $FS defaults 0 1
-UUID=$EFI_UUID /boot/efi vfat defaults 0 1
-EOF
+case $FS in
+    ext4)
+        echo "UUID=$EFI_UUID /boot/efi vfat defaults 0 1" > /mnt/etc/fstab
+        echo "UUID=$ROOT_UUID / ext4 defaults 0 1" >> /mnt/etc/fstab
+        ;;
+    btrfs)
+        echo "UUID=$ROOT_UUID /           btrfs noatime,compress=zstd,subvol=@            0 0" > /mnt/etc/fstab
+        echo "UUID=$ROOT_UUID /home       btrfs noatime,compress=zstd,subvol=@home        0 0" >> /mnt/etc/fstab
+        echo "UUID=$ROOT_UUID /root       btrfs noatime,compress=zstd,subvol=@root        0 0" >> /mnt/etc/fstab
+        echo "UUID=$ROOT_UUID /var        btrfs noatime,compress=zstd,subvol=@var         0 0" >> /mnt/etc/fstab
+        echo "UUID=$ROOT_UUID /tmp        btrfs noatime,compress=zstd,subvol=@tmp         0 0" >> /mnt/etc/fstab
+        echo "UUID=$ROOT_UUID /.snapshots btrfs noatime,compress=zstd,subvol=@snapshots   0 0" >> /mnt/etc/fstab
+        echo "UUID=$EFI_UUID /boot/efi vfat defaults 0 1" >> /mnt/etc/fstab
+        ;;
+esac
 
 # Network configuration
 cat <<EOF > /mnt/etc/network/interfaces

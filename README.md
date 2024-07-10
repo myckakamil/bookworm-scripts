@@ -21,3 +21,17 @@ cd bookwork-scripts
 chmod +x setup.sh
 sudo ./setup.sh
 ```
+
+# TODO
+## debootstrap-install.sh
+- [ ] SSH server
+- [ ] ZFS
+- [ ] XFS
+- [ ] LVM
+- [ ] LUKS
+- [ ] More partition layouts
+- [ ] Code optimizations
+
+## setup.sh
+- [ ] Repair DWM installation
+- [ ] Create dotfiles installation script

@@ -264,7 +264,8 @@ while true; do
                 case $SCRIPTS in
                     yes)
                         chroot /mnt /bin/bash -c "apt-get install -y git"
-                        chroot /mnt /bin/bash -c "git clone https://github.com/Mordimmer/bookwork-scripts /home/$USERNAME/bookwork-scripts"
+                        chroot /mnt /bin/bash -c "mkdir /home/$USERNAME/Git"
+                        chroot /mnt /bin/bash -c "git clone https://github.com/Mordimmer/bookwork-scripts /home/$USERNAME/Git/bookwork-scripts"
                         break
                         ;;
                     no)

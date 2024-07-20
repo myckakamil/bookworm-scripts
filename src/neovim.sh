@@ -10,3 +10,6 @@ cd neovim
 
 make CMAKE_BUILD_TYPE=RelWithDebInfo
 make install
+
+cd ..
+rm -rf neovim

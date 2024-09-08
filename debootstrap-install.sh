@@ -102,10 +102,10 @@ done
 while true; do
     read -p "WARNING: This will erase all data on $DYSK. Continue? (yes/no): " confirm
     case $confirm in
-        yes)
+        yes | y)
             break
             ;;
-        no)
+        no | n)
             echo "Operation cancelled."
             exit 1
             ;;
@@ -129,16 +129,17 @@ echo "Finished partitioning $DYSK."
 
 echo "Formatting partitions..."
 mkfs.vfat "${DYSK}1" 
-mkfs."$FS" "${DYSK}2" -f
 
 case $FS in
     ext4)
+        mkfs.ext4 "${DYSK}2"
         echo "Mounting partitions..."
         mount "${DYSK}2" /mnt
         mkdir -p /mnt/boot/efi
         mount "${DYSK}1" /mnt/boot/efi
         ;;
     btrfs)
+        mkfs.btrfs "${DYSK}2"
         echo "Creating subvolumes..."
         mount "${DYSK}2" /mnt
         btrfs subvolume create /mnt/@
@@ -162,7 +163,7 @@ case $FS in
         ;;
 esac
 
-apt-get update && apt-get upgrade -y
+apt-get update
 apt-get install -y debootstrap
 
 debootstrap $WERSJA /mnt

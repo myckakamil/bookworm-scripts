@@ -2,7 +2,7 @@ echo "Debian installation script"
 echo "Works only on UEFI systems, and create only two partitions: EFI and root."
 echo "This script will erase all data on the selected disk."
 
-# Checking if the script is running as root...
+# Checking if the script is running as root
 if [ "$EUID" -ne 0 ]; then
     echo "Please run this script as root."
     exit 1
@@ -139,7 +139,7 @@ case $FS in
         mount "${DYSK}1" /mnt/boot/efi
         ;;
     btrfs)
-        mkfs.btrfs "${DYSK}2"
+        mkfs.btrfs "${DYSK}2" -f
         echo "Creating subvolumes..."
         mount "${DYSK}2" /mnt
         btrfs subvolume create /mnt/@
@@ -169,7 +169,7 @@ apt-get install -y debootstrap
 debootstrap $WERSJA /mnt
 
 echo "deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware" > /mnt/etc/apt/sources.list
-if [ "$WERSJA" != "stable" ]; then
+if [ "$WERSJA" == "stable" ]; then
     echo "deb http://deb.debian.org/debian-security/ $WERSJA-security main contrib non-free non-free-firmware" >> /mnt/etc/apt/sources.list
     echo "deb http://deb.debian.org/debian $WERSJA-updates main contrib non-free non-free-firmware" >> /mnt/etc/apt/sources.list
 fi

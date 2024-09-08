@@ -229,6 +229,10 @@ EOF
 # Installing end enabling DHCP client
 chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
 
+if $FS == "btrfs"; then
+    chroot /mnt /bin/bash -c "apt-get install -y btrfs-progs"
+fi
+
 echo "Change your root password"
 echo "Root password:"
 chroot /mnt /bin/bash -c "passwd"

@@ -201,20 +201,27 @@ case $FS in
         ;;
 esac
 
-# Network configuration
-cat <<EOF > /mnt/etc/network/interfaces
-auto lo
-iface lo inet loopback
-
-auto enp0s1
-iface enp0s1 inet dhcp
-EOF
 
 # Generating locales
 chroot /mnt /bin/bash -c "apt-get install -y locales && echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
 
 # Setting up timezone
 chroot /mnt /bin/bash -c "ln -sf /usr/share/zoneinfo/Europe/Warsaw /etc/localtime"
+
+# Setting up keyboard layout
+chroot /mnt /bin/bash -c "echo 'KEYMAP=pl' > /etc/vconsole.conf"
+
+# Setting up old network naming
+chroot /mnt /bin/bash -c "sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' /etc/default/grub && update-grub"
+
+# Network configuration
+cat <<EOF > /mnt/etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+EOF
 
 # Setting up hostname
 echo "$HOSTNAME" > /mnt/etc/hostname

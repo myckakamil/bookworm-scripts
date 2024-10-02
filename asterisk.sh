@@ -13,7 +13,6 @@ wget http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-20-current.ta
 tar xvf asterisk-20-current.tar.gz
 cd /usr/src/asterisk-20.*
 ./configure
-make menuselect
 manuselect/menuselect --enable pbx_lua menuselect --enable codec_opus menuselect --enable codec_g729
 make
 make install

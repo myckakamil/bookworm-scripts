@@ -12,8 +12,11 @@ cd /usr/src/
 wget http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-20-current.tar.gz
 tar xvf asterisk-20-current.tar.gz
 cd /usr/src/asterisk-20.*
+
+# Configure and build Asterisk
 ./configure
-manuselect/menuselect --enable pbx_lua menuselect --enable codec_opus menuselect --enable codec_g729
+contrib/scripts/get_mp3_source.sh
+menuselect/menuselect --enable pbx_lua --enable codec_opus --enable codec_g729
 make
 make install
 make config

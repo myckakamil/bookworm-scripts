@@ -1,8 +1,6 @@
 clear
-echo "Debian installation script"
-echo ""
-echo "Works only on UEFI systems, and create only two partitions: EFI and root."
-echo "This script will erase all data on the selected disk."
+echo -e "Debian installation script\n\nWorks only on UEFI systems, and creates only two partitions: EFI and root.\nThis script will erase all data on the selected disk.\n"
+
 
 echo -n "Updating system"
 while true; do
@@ -154,8 +152,6 @@ echo "Finished partitioning $DYSK."
 echo "Formatting partitions..."
 mkfs.vfat "${DYSK}1" 
 
-
-
 case $FS in
     ext4)
         mkfs.ext4 "${DYSK}2"
@@ -194,8 +190,6 @@ figlet "Installing Debian"
 echo "$WERSJA on $DYSK"
 
 debootstrap $WERSJA /mnt
-
-clear
 
 echo "deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware" > /mnt/etc/apt/sources.list
 if [ "$WERSJA" == "stable" ]; then
@@ -274,23 +268,59 @@ echo "Root password:"
 chroot /mnt /bin/bash -c "passwd"
 clear
 
+while true; do
+    read -p "Do you want to enable ssh? (yes/no): " SSH
+    case $SSH in
+        yes | y)
+            chroot /mnt /bin/bash -c "apt-get install -y openssh-server"
+            chroot /mnt /bin/bash -c "systemctl enable ssh"
+            clear 
+            while true; do
+                read -p "Do you want to allow root login via SSH? (yes/no): " ROOTSSH
+                case $ROOTSSH in
+                    yes)
+                        sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /mnt/etc/ssh/sshd_config
+                        break
+                        ;;
+                    no)
+                        echo "Root login disabled."
+                        break
+                        ;;
+                    *)
+                        echo "Invalid choice. Please select 'yes' or 'no'."
+                        ;;
+                esac
+            done
+            break
+            ;;
+        no | n)
+            echo "SSH not enabled."
+            break
+            ;;
+        *)
+            echo "Invalid choice. Please select 'yes' or 'no'."
+            ;;
+    esac
+done
+clear
+
 # Creating a new user
 echo "Do you want to create a new user?"
 while true; do
     read -p "Create a new user? (yes/no): " USER
     case $USER in
-        yes)
+        yes | y)
             read -p "Enter the full name of the user: " FULLNAME
             read -p "Enter the username: " USERNAME
             chroot /mnt /bin/bash -c "useradd -m -G users -s /bin/bash -c \"$FULLNAME\" $USERNAME"
-            read -p "Will $USERNAME be a sudo user? (yes/no): " SUDO
             while true; do
+                read -p "Will $USERNAME be a sudo user? (yes/no): " SUDO
                 case $SUDO in
-                    yes)
+                    yes | y)
                         chroot /mnt /bin/bash -c "usermod -aG sudo $USERNAME"
                         break
                         ;;
-                    no)
+                    no | n)
                         break
                         ;;
                     *)
@@ -301,18 +331,17 @@ while true; do
             echo "User password:"
             chroot /mnt /bin/bash -c "passwd $USERNAME"
             clear
-            echo "Do you want to predownload my setup scripts? (yes/no)"
             while true; do
-                read SCRIPTS
+                read "Do you want to predownload my setup scripts? (yes/no): " SCRIPTS
                 case $SCRIPTS in
-                    yes)
+                    yes | y)
                         chroot /mnt /bin/bash -c "apt-get install -y git"
                         chroot /mnt /bin/bash -c "mkdir /home/$USERNAME/"
                         chroot /mnt /bin/bash -c "git clone https://github.com/Mordimmer/bookwork-scripts /home/$USERNAME/bookwork-scripts"
                         chroot /mnt /bin/bash -c "chown -R $USERNAME:$USERNAME /home/$USERNAME/bookwork-scripts"
                         break
                         ;;
-                    no)
+                    no | n)
                         echo "No scripts downloaded."
                         break
                         ;;
@@ -323,7 +352,7 @@ while true; do
             done
             break
             ;;
-        no)
+        no | n)
             echo "No user created."
             break
             ;;
@@ -332,6 +361,9 @@ while true; do
             ;;
     esac
 done
-
 clear
+
+
+
 echo "Installation finished. You can now reboot your system."
+ip -c -br a

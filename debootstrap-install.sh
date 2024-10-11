@@ -1,6 +1,24 @@
+clear
 echo "Debian installation script"
+echo ""
 echo "Works only on UEFI systems, and create only two partitions: EFI and root."
 echo "This script will erase all data on the selected disk."
+
+echo -n "Updating system"
+while true; do
+    for s in / - \\ \|; do
+        printf "\rUpdating system and installing packages %s" "$s"
+        sleep 0.1
+    done
+done &
+SPIN_PID=$!
+
+apt-get update > /dev/null
+apt-get install -y debootstrap parted figlet > /dev/null
+
+kill $SPIN_PID
+printf "\rSystem updated and packages installed \n"
+
 
 # Checking if the script is running as root
 if [ "$EUID" -ne 0 ]; then
@@ -19,6 +37,8 @@ if ! ping -c 1 google.com &> /dev/null; then
     echo "No internet connection. Please connect to the internet and run the script again."
     exit 1
 fi
+
+clear
 
 echo "How do you want to name your computer?"
 read -p "Enter the hostname: " HOSTNAME
@@ -50,6 +70,7 @@ while true; do
             ;;
     esac
 done
+clear
 
 while true; do
     DYSKI=($(lsblk -d -n -o NAME))
@@ -69,6 +90,7 @@ while true; do
         echo "Invalid choice. Please select a valid number."
     fi
 done
+clear
 
 while true; do
     echo "Which filesystem do you want to use?"
@@ -98,6 +120,7 @@ while true; do
             ;;
     esac
 done
+clear
 
 while true; do
     read -p "WARNING: This will erase all data on $DYSK. Continue? (yes/no): " confirm
@@ -114,6 +137,7 @@ while true; do
             ;;
     esac
 done
+clear
 
 echo "Creating partitions on $DYSK..."
 
@@ -129,6 +153,8 @@ echo "Finished partitioning $DYSK."
 
 echo "Formatting partitions..."
 mkfs.vfat "${DYSK}1" 
+
+
 
 case $FS in
     ext4)
@@ -162,11 +188,14 @@ case $FS in
     *)
         ;;
 esac
+clear
 
-apt-get update
-apt-get install -y debootstrap
+figlet "Installing Debian" 
+echo "$WERSJA on $DYSK"
 
 debootstrap $WERSJA /mnt
+
+clear
 
 echo "deb http://deb.debian.org/debian $WERSJA main contrib non-free non-free-firmware" > /mnt/etc/apt/sources.list
 if [ "$WERSJA" == "stable" ]; then
@@ -238,10 +267,12 @@ chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd"
 if $FS == "btrfs"; then
     chroot /mnt /bin/bash -c "apt-get install -y btrfs-progs"
 fi
+clear
 
 echo "Change your root password"
 echo "Root password:"
 chroot /mnt /bin/bash -c "passwd"
+clear
 
 # Creating a new user
 echo "Do you want to create a new user?"
@@ -269,14 +300,16 @@ while true; do
             done
             echo "User password:"
             chroot /mnt /bin/bash -c "passwd $USERNAME"
+            clear
             echo "Do you want to predownload my setup scripts? (yes/no)"
             while true; do
                 read SCRIPTS
                 case $SCRIPTS in
                     yes)
                         chroot /mnt /bin/bash -c "apt-get install -y git"
-                        chroot /mnt /bin/bash -c "mkdir /home/$USERNAME/Git"
-                        chroot /mnt /bin/bash -c "git clone https://github.com/Mordimmer/bookwork-scripts /home/$USERNAME/Git/bookwork-scripts"
+                        chroot /mnt /bin/bash -c "mkdir /home/$USERNAME/"
+                        chroot /mnt /bin/bash -c "git clone https://github.com/Mordimmer/bookwork-scripts /home/$USERNAME/bookwork-scripts"
+                        chroot /mnt /bin/bash -c "chown -R $USERNAME:$USERNAME /home/$USERNAME/bookwork-scripts"
                         break
                         ;;
                     no)
@@ -294,12 +327,12 @@ while true; do
             echo "No user created."
             break
             ;;
-        *)
+        *)echo "Debian installation script \n"
+echo "Works only on UEFI systems, and create only two partitions: EFI and root."
             echo "Invalid choice. Please select 'yes' or 'no'."
             ;;
     esac
 done
 
-
-
+clear
 echo "Installation finished. You can now reboot your system."

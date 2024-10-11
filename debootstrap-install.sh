@@ -327,8 +327,7 @@ while true; do
             echo "No user created."
             break
             ;;
-        *)echo "Debian installation script \n"
-echo "Works only on UEFI systems, and create only two partitions: EFI and root."
+        *)
             echo "Invalid choice. Please select 'yes' or 'no'."
             ;;
     esac

@@ -24,7 +24,8 @@ sudo ./setup.sh
 
 # TODO
 ## debootstrap-install.sh
-- [ ] SSH server
+- [x] SSH server
+- [ ] BIOS support
 - [ ] ZFS
 - [ ] XFS
 - [ ] LVM
@@ -33,5 +34,6 @@ sudo ./setup.sh
 - [ ] Code optimizations
 
 ## setup.sh
-- [ ] Repair DWM installation
+- [ ] Create DWM installer
 - [ ] Create dotfiles installation script
+- [ ] Run asterisk installer

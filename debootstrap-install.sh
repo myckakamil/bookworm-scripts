@@ -25,9 +25,12 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Checking if the system is running in UEFI mode
-if [ ! -d /sys/firmware/efi ]; then
-    echo "This script works only on UEFI systems."
-    exit 1
+if [ -d /sys/firmware/efi ]; then
+    echo "You are using UEFI system."
+    BOOT_MODE=UEFI
+    else
+    echo "You are using BIOS system."
+    BOOT_MODE=BIOS
 fi
 
 # Checking if the system is connected to the internet

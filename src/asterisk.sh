@@ -178,3 +178,6 @@ noload = res_hep.so
 noload = res_hep_pjsip.so
 noload = res_hep_rtcp.so
 EOF
+
+systemctl enable asterisk
+systemctl restart asterisk

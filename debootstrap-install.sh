@@ -142,52 +142,111 @@ clear
 
 echo "Creating partitions on $DYSK..."
 
-parted "$DYSK" --script mklabel gpt \
-    mkpart boot fat32 1MiB 1001MiB \
-    set 1 esp on \
-    mkpart primary $FS 1001MiB 100%
+if [ "$BOOT_MODE" == "UEFI" ]; then
+    parted "$DYSK" --script mklabel gpt \
+        mkpart boot fat32 1MiB 1001MiB \
+        set 1 esp on \
+        mkpart primary $FS 1001MiB 100%
 
-echo "Partitions created:"
-lsblk "$DYSK"
+    echo "UEFI boot partition created"
+    lsblk "$DYSK"
 
-echo "Finished partitioning $DYSK."
+    echo "Finished partitioning $DYSK."
 
-echo "Formatting partitions..."
-mkfs.vfat "${DYSK}1" 
+    echo "Formatting partitions..."
+    mkfs.vfat "${DYSK}1" 
 
-case $FS in
-    ext4)
-        mkfs.ext4 "${DYSK}2"
-        echo "Mounting partitions..."
-        mount "${DYSK}2" /mnt
-        mkdir -p /mnt/boot/efi
-        mount "${DYSK}1" /mnt/boot/efi
-        ;;
-    btrfs)
-        mkfs.btrfs "${DYSK}2" -f
-        echo "Creating subvolumes..."
-        mount "${DYSK}2" /mnt
-        btrfs subvolume create /mnt/@
-        btrfs subvolume create /mnt/@home
-        btrfs subvolume create /mnt/@root
-        btrfs subvolume create /mnt/@var
-        btrfs subvolume create /mnt/@tmp
-        btrfs subvolume create /mnt/@snapshots
+    case $FS in
+        ext4)
+            mkfs.ext4 "${DYSK}2"
+            echo "Mounting partitions..."
+            mount "${DYSK}2" /mnt
+            mkdir -p /mnt/boot/efi
+            mount "${DYSK}1" /mnt/boot/efi
+            ;;
+        btrfs)
+            mkfs.btrfs "${DYSK}2" -f
+            echo "Creating subvolumes..."
+            mount "${DYSK}2" /mnt
+            btrfs subvolume create /mnt/@
+            btrfs subvolume create /mnt/@home
+            btrfs subvolume create /mnt/@root
+            btrfs subvolume create /mnt/@var
+            btrfs subvolume create /mnt/@tmp
+            btrfs subvolume create /mnt/@snapshots
 
-        echo "Mounting subvolumes..."
-        mount -o noatime,compress=zstd,subvol=@ "$DYSK"2 /mnt
-        mkdir -p /mnt/{home,root,var,tmp,.snapshots}
-        mkdir -p /mnt/boot/efi
-        mount -o noatime,compress=zstd,subvol=@home "$DYSK"2 /mnt/home
-        mount -o noatime,compress=zstd,subvol=@var "$DYSK"2 /mnt/var
-        mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"2 /mnt/tmp
-        mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"2 /mnt/.snapshots
-        mount "${DYSK}"1 /mnt/boot/efi
-        ;;
-    *)
-        ;;
-esac
-clear
+            echo "Mounting subvolumes..."
+            mount -o noatime,compress=zstd,subvol=@ "$DYSK"2 /mnt
+            mkdir -p /mnt/{home,root,var,tmp,.snapshots}
+            mkdir -p /mnt/boot/efi
+            mount -o noatime,compress=zstd,subvol=@home "$DYSK"2 /mnt/home
+            mount -o noatime,compress=zstd,subvol=@var "$DYSK"2 /mnt/var
+            mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"2 /mnt/tmp
+            mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"2 /mnt/.snapshots
+            mount "${DYSK}"1 /mnt/boot/efi
+            ;;
+        *)
+            ;;
+    esac
+else
+    parted "$DYSK" --script mkpart biosboot 1MiB 2MiB
+    parted "$DYSK" --script set 1 bios_grub on
+    echo "BIOS boot partition created."
+
+    
+    echo "Creating partitions on $DYSK..."
+
+    # Tworzenie tablicy partycji GPT i podstawowych partycji
+    parted "$DYSK" --script mklabel gpt \
+        mkpart boot fat32 2MiB 1002MiB \
+        set 2 esp on \
+        mkpart primary $FS 1002MiB 100%
+
+    # Tworzenie partycji BIOS Boot
+    create_and_format_bios_partition
+
+    echo "Partitions created:"
+    lsblk "$DYSK"
+
+    echo "Finished partitioning $DYSK."
+
+    echo "Formatting partitions..."
+    mkfs.vfat "${DYSK}2" 
+    case $FS in
+        ext4)
+            mkfs.ext4 "${DYSK}3"
+            echo "Mounting partitions..."
+            mount "${DYSK}3" /mnt
+            mkdir -p /mnt/boot/efi
+            mount "${DYSK}2" /mnt/boot/efi
+            ;;
+        btrfs)
+            mkfs.btrfs "${DYSK}3" -f
+            echo "Creating subvolumes..."
+            mount "${DYSK}3" /mnt
+            btrfs subvolume create /mnt/@
+            btrfs subvolume create /mnt/@home
+            btrfs subvolume create /mnt/@root
+            btrfs subvolume create /mnt/@var
+            btrfs subvolume create /mnt/@tmp
+            btrfs subvolume create /mnt/@snapshots
+
+            echo "Mounting subvolumes..."
+            mount -o noatime,compress=zstd,subvol=@ "$DYSK"3 /mnt
+            mkdir -p /mnt/{home,root,var,tmp,.snapshots}
+            mkdir -p /mnt/boot/efi
+            mount -o noatime,compress=zstd,subvol=@home "$DYSK"3 /mnt/home
+            mount -o noatime,compress=zstd,subvol=@var "$DYSK"3 /mnt/var
+            mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"3 /mnt/tmp
+            mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"3 /mnt/.snapshots
+            mount "${DYSK}"2 /mnt/boot/efi
+            ;;
+        *)
+            ;;
+    esac
+fi
+
+    clear
 
 figlet "Installing Debian" 
 echo "$WERSJA on $DYSK"

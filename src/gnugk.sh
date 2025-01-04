@@ -48,3 +48,6 @@ Group=gnugk
 WantedBy=multi-user.target
 EOF
 
+systemctl daemon-reload 
+systemctl enable gnugk
+systemctl start gnugk

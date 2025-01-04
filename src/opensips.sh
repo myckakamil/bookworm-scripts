@@ -33,3 +33,6 @@ EOF
 systemctl daemon-reload
 systemctl enable opensips
 systemctl start opensips
+
+clear
+echo "Now you can edit config file, located at - /usr/local/etc/opensips"

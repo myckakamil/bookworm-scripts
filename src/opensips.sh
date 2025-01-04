@@ -7,14 +7,25 @@ make install
 # Systemd unit don't work. Not sure why. Besides that, all seems to be fine
 cat > /etc/systemd/system/opensips.service << EOF
 [Unit]
-Description=OpenSIPS - Open SIP Server
-After=network.target
+Description=OpenSIPS is a very fast and flexible SIP (RFC3261) server
+Documentation=man:opensips
+After=network.target mysqld.service postgresql.service rtpproxy.service
 
 [Service]
 Type=forking
-ExecStart=/usr/local/sbin/opensips -f /usr/local/etc/opensips/opensips.cfg -m 128 -M 16
-ExecStop=/usr/local/sbin/opensipsctl stop
+User=opensips
+Group=opensips
+RuntimeDirectory=opensips
+RuntimeDirectoryMode=775
+Environment=P_MEMORY=32 S_MEMORY=32
+EnvironmentFile=-/etc/default/opensips
+PermissionsStartOnly=yes
+PIDFile=%t/opensips/opensips.pid
+ExecStart=/usr/sbin/opensips -P %t/opensips/opensips.pid -f /etc/opensips/opensips.cfg -m $S_MEMORY -M $P_MEMORY $OPTIONS
+ExecStop=/usr/bin/pkill --pidfile %t/opensips/opensips.pid
 Restart=always
+TimeoutStopSec=30s
+LimitNOFILE=262144
 
 [Install]
 WantedBy=multi-user.target

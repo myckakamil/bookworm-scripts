@@ -4,28 +4,25 @@ cd opensips-3.5
 make all
 make install
 
-# Systemd unit don't work. Not sure why. Besides that, all seems to be fine
+useradd -r -s /bin/false opensips
+mv /usr/local/etc/opensips /etc/opensips
+chown -R opensips:opensips /etc/opensips
+
+
 cat > /etc/systemd/system/opensips.service << EOF
 [Unit]
-Description=OpenSIPS is a very fast and flexible SIP (RFC3261) server
-Documentation=man:opensips
-After=network.target mysqld.service postgresql.service rtpproxy.service
+Description=OpenSIPS SIP Proxy Server
+After=network.target
 
 [Service]
-Type=forking
-User=opensips
-Group=opensips
-RuntimeDirectory=opensips
-RuntimeDirectoryMode=775
-Environment=P_MEMORY=32 S_MEMORY=32
-EnvironmentFile=-/etc/default/opensips
-PermissionsStartOnly=yes
-PIDFile=%t/opensips/opensips.pid
-ExecStart=/usr/sbin/opensips -P %t/opensips/opensips.pid -f /etc/opensips/opensips.cfg -m $S_MEMORY -M $P_MEMORY $OPTIONS
-ExecStop=/usr/bin/pkill --pidfile %t/opensips/opensips.pid
+Type=simple
+ExecStart=/usr/local/sbin/opensips -f /etc/opensips/opensips.cfg -P /var/run/opensips.pid
+WorkingDirectory=/etc/opensips
 Restart=always
-TimeoutStopSec=30s
-LimitNOFILE=262144
+RestartSec=5
+User=gnugk
+Group=gnugk
+
 
 [Install]
 WantedBy=multi-user.target
@@ -35,4 +32,4 @@ systemctl enable opensips
 systemctl start opensips
 
 clear
-echo "Now you can edit config file, located at - /usr/local/etc/opensips"
+echo "Now you can edit config file, located at - /etc/opensips"

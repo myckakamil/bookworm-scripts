@@ -189,41 +189,27 @@ if [ "$BOOT_MODE" == "UEFI" ]; then
             ;;
     esac
 else
-    parted "$DYSK" --script mkpart biosboot 1MiB 2MiB
-    parted "$DYSK" --script set 1 bios_grub on
-    echo "BIOS boot partition created."
+    # Creating partitions for BIOS
+    parted "$DYSK" --script mklabel msdos \
+        mkpart primary $FS 1MiB 100% \
+        set 1 boot on
 
-    
-    echo "Creating partitions on $DYSK..."
-
-    # Tworzenie tablicy partycji GPT i podstawowych partycji
-    parted "$DYSK" --script mklabel gpt \
-        mkpart boot fat32 2MiB 1002MiB \
-        set 2 esp on \
-        mkpart primary $FS 1002MiB 100%
-
-    # Tworzenie partycji BIOS Boot
-    create_and_format_bios_partition
-
-    echo "Partitions created:"
+    echo "BIOS boot partition created"
     lsblk "$DYSK"
 
     echo "Finished partitioning $DYSK."
 
-    echo "Formatting partitions..."
-    mkfs.vfat "${DYSK}2" 
+    echo "Formatting partitions"
     case $FS in
         ext4)
-            mkfs.ext4 "${DYSK}3"
+            mkfs.ext4 "${DYSK}1"
             echo "Mounting partitions..."
-            mount "${DYSK}3" /mnt
-            mkdir -p /mnt/boot/efi
-            mount "${DYSK}2" /mnt/boot/efi
+            mount "${DYSK}1" /mnt
             ;;
         btrfs)
-            mkfs.btrfs "${DYSK}3" -f
+            mkfs.btrfs "${DYSK}1" -f
             echo "Creating subvolumes..."
-            mount "${DYSK}3" /mnt
+            mount "${DYSK}1" /mnt
             btrfs subvolume create /mnt/@
             btrfs subvolume create /mnt/@home
             btrfs subvolume create /mnt/@root
@@ -232,19 +218,18 @@ else
             btrfs subvolume create /mnt/@snapshots
 
             echo "Mounting subvolumes..."
-            mount -o noatime,compress=zstd,subvol=@ "$DYSK"3 /mnt
+            mount -o noatime,compress=zstd,subvol=@ "$DYSK"1 /mnt
             mkdir -p /mnt/{home,root,var,tmp,.snapshots}
-            mkdir -p /mnt/boot/efi
-            mount -o noatime,compress=zstd,subvol=@home "$DYSK"3 /mnt/home
-            mount -o noatime,compress=zstd,subvol=@var "$DYSK"3 /mnt/var
-            mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"3 /mnt/tmp
-            mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"3 /mnt/.snapshots
-            mount "${DYSK}"2 /mnt/boot/efi
+            mount -o noatime,compress=zstd,subvol=@home "$DYSK"1 /mnt/home
+            mount -o noatime,compress=zstd,subvol=@var "$DYSK"1 /mnt/var
+            mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"1 /mnt/tmp
+            mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"1 /mnt/.snapshots
             ;;
         *)
             ;;
     esac
 fi
+
 
     clear
 
@@ -263,28 +248,50 @@ for dir in sys dev proc; do
     mount --rbind /$dir /mnt/$dir && mount --make-rslave /mnt/$dir
 done
 
-chroot /mnt /bin/bash -c "apt-get update && apt-get upgrade -y && apt-get install -y linux-image-amd64 grub-efi-amd64 efibootmgr sudo"
-chroot /mnt /bin/bash -c "grub-install /dev/${DYSK}1 && update-grub"
+if [ "$BOOT_MODE" == "UEFI" ]; then
+    chroot /mnt /bin/bash -c "apt-get update && apt-get upgrade -y && apt-get install -y linux-image-amd64 grub-efi-amd64 efibootmgr sudo grub2-common"
+    chroot /mnt /bin/bash -c "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=debian && update-grub"
+else
+    chroot /mnt /bin/bash -c "apt-get update && apt-get upgrade -y && apt-get install -y linux-image-amd64 grub-pc sudo grub2-common"
+    chroot /mnt /bin/bash -c "grub-install $DYSK && update-grub"
+fi
 
-# Setting up fstab
-EFI_UUID=$(blkid -s UUID -o value "${DYSK}1")
-ROOT_UUID=$(blkid -s UUID -o value "${DYSK}2")
+if [ "$BOOT_MODE" == "UEFI" ]; then
+    EFI_UUID=$(blkid -s UUID -o value "${DYSK}1")
+    ROOT_UUID=$(blkid -s UUID -o value "${DYSK}2")
 
-case $FS in
-    ext4)
-        echo "UUID=$EFI_UUID /boot/efi vfat defaults 0 1" > /mnt/etc/fstab
-        echo "UUID=$ROOT_UUID / ext4 defaults 0 1" >> /mnt/etc/fstab
-        ;;
-    btrfs)
-        echo "UUID=$ROOT_UUID /           btrfs noatime,compress=zstd,subvol=@            0 0" > /mnt/etc/fstab
-        echo "UUID=$ROOT_UUID /home       btrfs noatime,compress=zstd,subvol=@home        0 0" >> /mnt/etc/fstab
-        echo "UUID=$ROOT_UUID /root       btrfs noatime,compress=zstd,subvol=@root        0 0" >> /mnt/etc/fstab
-        echo "UUID=$ROOT_UUID /var        btrfs noatime,compress=zstd,subvol=@var         0 0" >> /mnt/etc/fstab
-        echo "UUID=$ROOT_UUID /tmp        btrfs noatime,compress=zstd,subvol=@tmp         0 0" >> /mnt/etc/fstab
-        echo "UUID=$ROOT_UUID /.snapshots btrfs noatime,compress=zstd,subvol=@snapshots   0 0" >> /mnt/etc/fstab
-        echo "UUID=$EFI_UUID /boot/efi vfat defaults 0 1" >> /mnt/etc/fstab
-        ;;
-esac
+    case $FS in
+        ext4)
+            echo "UUID=$EFI_UUID /boot/efi vfat defaults 0 1" > /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID / ext4 defaults 0 1" >> /mnt/etc/fstab
+            ;;
+        btrfs)
+            echo "UUID=$ROOT_UUID /           btrfs noatime,compress=zstd,subvol=@            0 0" > /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /home       btrfs noatime,compress=zstd,subvol=@home        0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /root       btrfs noatime,compress=zstd,subvol=@root        0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /var        btrfs noatime,compress=zstd,subvol=@var         0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /tmp        btrfs noatime,compress=zstd,subvol=@tmp         0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /.snapshots btrfs noatime,compress=zstd,subvol=@snapshots   0 0" >> /mnt/etc/fstab
+            echo "UUID=$EFI_UUID /boot/efi vfat defaults 0 1" >> /mnt/etc/fstab
+            ;;
+    esac
+else
+    ROOT_UUID=$(blkid -s UUID -o value "${DYSK}1")
+
+    case $FS in
+        ext4)
+            echo "UUID=$ROOT_UUID / ext4 defaults 0 1" > /mnt/etc/fstab
+            ;;
+        btrfs)
+            echo "UUID=$ROOT_UUID /           btrfs noatime,compress=zstd,subvol=@            0 0" > /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /home       btrfs noatime,compress=zstd,subvol=@home        0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /root       btrfs noatime,compress=zstd,subvol=@root        0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /var        btrfs noatime,compress=zstd,subvol=@var         0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /tmp        btrfs noatime,compress=zstd,subvol=@tmp         0 0" >> /mnt/etc/fstab
+            echo "UUID=$ROOT_UUID /.snapshots btrfs noatime,compress=zstd,subvol=@snapshots   0 0" >> /mnt/etc/fstab
+            ;;
+    esac
+fi
 
 
 # Generating locales

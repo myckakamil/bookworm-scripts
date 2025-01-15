@@ -5,7 +5,7 @@
 For now suggested location to download the scripts is /home/$USER/Git directory.
 
 ## Installation
-This script is intended to be used on a live CD to install a Debian system. 
+This script is intended to be used on a rescue CD to install a Debian system. 
 ```bash
 git clone https://github.com/Mordimmer/bookwork-scripts
 cd bookwork-scripts
@@ -25,15 +25,18 @@ sudo ./setup.sh
 # TODO
 ## debootstrap-install.sh
 - [x] SSH server
-- [ ] BIOS support
+- [x] BIOS support
 - [ ] ZFS
 - [ ] XFS
 - [ ] LVM
 - [ ] LUKS
 - [ ] More partition layouts
 - [ ] Code optimizations
+- [ ] RAID
+- [ ] TUI
 
 ## setup.sh
 - [ ] Create DWM installer
 - [ ] Create dotfiles installation script
 - [ ] Run asterisk installer
+- [ ] Ansible automation

@@ -1,148 +1,173 @@
-clear
-echo -e "Debian installation script\n\nWorks only on UEFI systems, and creates only two partitions: EFI and root.\nThis script will erase all data on the selected disk.\n"
+#!/bin/bash
 
+# install dialog if not present
+if ! command -v dialog >/dev/null 2>&1; then
+    apt-get update
+    apt-get install -y dialog
+fi
 
-echo -n "Updating system"
-while true; do
-    for s in / - \\ \|; do
-        printf "\rUpdating system and installing packages %s" "$s"
-        sleep 0.1
-    done
-done &
-SPIN_PID=$!
+# function to show progress
+show_progress() {
+    echo $2 | dialog --gauge "$1" 10 70 0
+}
 
-apt-get update > /dev/null
-apt-get install -y debootstrap parted figlet > /dev/null
-
-kill $SPIN_PID
-printf "\rSystem updated and packages installed \n"
-
-
-# Checking if the script is running as root
-if [ "$EUID" -ne 0 ]; then
-    echo "Please run this script as root."
+# check if root
+if [ "$euid" -ne 0 ]; then
+    dialog --title "error" --msgbox "please run this script as root." 8 40
     exit 1
 fi
 
-# Checking if the system is running in UEFI mode
+# check uefi/bios
 if [ -d /sys/firmware/efi ]; then
-    echo "You are using UEFI system."
-    BOOT_MODE=UEFI
-    else
-    echo "You are using BIOS system."
-    BOOT_MODE=BIOS
+    BOOT_MODE=uefi
+else
+    BOOT_MODE=bios
 fi
 
-# Checking if the system is connected to the internet
+# check internet connection
 if ! ping -c 1 google.com &> /dev/null; then
-    echo "No internet connection. Please connect to the internet and run the script again."
+    dialog --title "error" --msgbox "no internet connection. please connect to the internet and run the script again." 8 60
     exit 1
 fi
 
-clear
+# update system and install required packages
+dialog --title "system update" --infobox "updating system and installing required packages..." 8 60
 
-echo "How do you want to name your computer?"
-read -p "Enter the hostname: " HOSTNAME
+(
+echo "10" ; sleep 1
+apt-get update > /dev/null 2>&1
+echo "40" ; sleep 1
+apt-get install -y debootstrap parted figlet > /dev/null 2>&1
+echo "100" ; sleep 1
+) | dialog --title "progress" --gauge "installing required packages..." 10 70 0
+
+dialog --title "ready" --msgbox "system updated and ready for debian installation." 8 50
+
+# display warning
+dialog --title "warning" --yes-label "continue" --no-label "exit" --yesno "this script will create uefi/bios and root partitions.\nthis will erase all data on the selected disk.\n\ndo you want to continue?" 10 60
+
+if [ $? -ne 0 ]; then
+    clear
+    exit 1
+fi
+
+
+clear
+# get hostname
+hostname=$(dialog --title "hostname" \
+    --inputbox "enter the hostname for your computer:" 8 50 \
+    3>&1 1>&2 2>&3)
+
+# exit if canceled
+if [ $? -ne 0 ]; then
+    clear
+    exit 1
+fi
+
+# Ask user if they want to set up RAID
+dialog --title "RAID" --yesno "Do you want to set up RAID?" 8 50
+RAID=$?
+if [ $RAID -eq 0 ]; then
+    dialog --title "ERROR" --msgbox "RAID is not supported by this script yet." 8 50
+    clear
+fi
+
+# select debian version
+WERSJA=$(dialog --title "debian version" \
+    --menu "select debian version to install:" 12 50 3 \
+    "stable" "debian stable (recommended)" \
+    "testing" "debian testing (not tested)" \
+    "sid" "debian sid (not tested)" \
+    3>&1 1>&2 2>&3)
+
+if [ $? -ne 0 ]; then
+    clear
+    exit 1
+fi
 
 while true; do
-    echo "What Debian version do you want to install?"
-    echo "1. Stable"
-    echo "2. Testing NOT TESTED YET"
-    echo "3. Sid NOT TESTED YET"
-    read -p "Choose your preferred Debian version: " WERSJA
-    case $WERSJA in
-        1)
-            WERSJA="stable"
-            echo "You selected Debian Stable."
-            break
-            ;;
-        2)
-            WERSJA="testing"
-            echo "You selected Debian Testing."
-            break
-            ;;
-        3)
-            WERSJA="sid"
-            echo "You selected Debian Sid."
-            break
-            ;;
-        *)
-            echo "Invalid choice. Please select 1, 2, or 3."
-            ;;
-    esac
-done
-clear
+    unset MENU_OPTIONS
+    declare -a MENU_OPTIONS
+    while IFS= read -r line; do
+        FULL_NAME=$(echo "$line" | awk '{print $1}')
+        SIZE=$(echo "$line" | awk '{print $2}')
+        MENU_OPTIONS+=("$FULL_NAME" "($SIZE)")
+    done < <(lsblk -d -n -o name,size -p | grep "^/dev")
 
-while true; do
-    DYSKI=($(lsblk -d -n -o NAME))
+    DYSK=$(dialog --title "disk selection" \
+        --menu "select disk for debian installation:" 15 50 5 \
+        "${MENU_OPTIONS[@]}" \
+        3>&1 1>&2 2>&3)
 
-    echo "Enter the disk where you want to install Debian:"
-    for i in "${!DYSKI[@]}"; do
-        echo "$((i+1)). ${DYSKI[$i]}"
-    done
+    if [ $? -ne 0 ]; then
+        clear
+        exit 1
+    fi
 
-    read -p "Enter the number of your choice: " WYBOR
+    dialog --title "confirmation" --yesno "you selected disk: $DYSK\nis this correct?" 8 50
 
-    if [[ "$WYBOR" =~ ^[0-9]+$ ]] && [ "$WYBOR" -ge 1 ] && [ "$WYBOR" -le "${#DYSKI[@]}" ]; then
-        DYSK="/dev/${DYSKI[$((WYBOR-1))]}"
-        echo "You selected disk: $DYSK."
+    if [ $? -eq 0 ]; then
         break
-    else
-        echo "Invalid choice. Please select a valid number."
     fi
 done
-clear
 
 while true; do
-    echo "Which filesystem do you want to use?"
-    echo "1. ext4"
-    echo "2. btrfs"
-    echo "3. xfs   TODO"
-    echo "4. zfs   TODO"
-    read -p "Enter the number of your choice: " FS
+    fs=$(dialog --title "Filesystem Selection" \
+        --menu "Select filesystem to use:" 12 50 4 \
+        "ext4" "Extended Filesystem 4" \
+        "btrfs" "B-Tree Filesystem" \
+        "xfs" "XFS Filesystem (not supported yet)" \
+        "zfs" "ZFS Filesystem (not supported yet)" \
+        3>&1 1>&2 2>&3)
 
-    case $FS in
-        1)
+    if [ $? -ne 0 ]; then
+        clear
+        exit 1
+    fi
+
+    case $fs in
+        "ext4")
             FS=ext4
             break
             ;;
-        2)
+        "btrfs") 
             FS=btrfs
             break
             ;;
-        3)
-            echo "XFS is not supported by this script yet."
-            ;;
-        4)
-            echo "ZFS is not supported by this script yet."
-            ;;
-        *)
-            echo "Invalid choice. Please select a valid number."
+        "xfs"|"zfs")
+            dialog --title "ERROR" --msgbox "This filesystem is not supported yet." 8 50
+            continue
             ;;
     esac
 done
+
 clear
 
 while true; do
-    read -p "WARNING: This will erase all data on $DYSK. Continue? (yes/no): " confirm
-    case $confirm in
-        yes | y)
+    dialog --title "WARNING" --yes-label "Continue" --no-label "Cancel" \
+        --yesno "This will erase all data on $DYSK.\nAre you sure you want to continue?" 8 60
+
+    case $? in
+        0) # Yes
             break
             ;;
-        no | n)
-            echo "Operation cancelled."
+        1) # No
+            clear
             exit 1
-            ;;
-        *)
-            echo "Invalid choice. Please select 'yes' or 'no'."
             ;;
     esac
 done
+
 clear
+dialog --title "Creating Partitions" --infobox "Creating partitions on $DYSK..." 3 50
+sleep 1
 
-echo "Creating partitions on $DYSK..."
+# Clear the disk first, force unmount any partitions
+umount "$DYSK"* 2>/dev/null || true
+swapoff "$DYSK"* 2>/dev/null || true
+wipefs -af "$DYSK"
 
-if [ "$BOOT_MODE" == "UEFI" ]; then
+if [ "$BOOT_MODE" == "uefi" ]; then
     parted "$DYSK" --script mklabel gpt \
         mkpart boot fat32 1MiB 1001MiB \
         set 1 esp on \
@@ -158,7 +183,7 @@ if [ "$BOOT_MODE" == "UEFI" ]; then
 
     case $FS in
         ext4)
-            mkfs.ext4 "${DYSK}2"
+            mkfs.ext4 -F "${DYSK}2"
             echo "Mounting partitions..."
             mount "${DYSK}2" /mnt
             mkdir -p /mnt/boot/efi
@@ -202,7 +227,7 @@ else
     echo "Formatting partitions"
     case $FS in
         ext4)
-            mkfs.ext4 "${DYSK}1"
+            mkfs.ext4 -F "${DYSK}1"
             echo "Mounting partitions..."
             mount "${DYSK}1" /mnt
             ;;
@@ -214,9 +239,6 @@ else
             btrfs subvolume create /mnt/@home
             btrfs subvolume create /mnt/@root
             btrfs subvolume create /mnt/@var
-            btrfs subvolume create /mnt/@tmp
-            btrfs subvolume create /mnt/@snapshots
-
             echo "Mounting subvolumes..."
             mount -o noatime,compress=zstd,subvol=@ "$DYSK"1 /mnt
             mkdir -p /mnt/{home,root,var,tmp,.snapshots}
@@ -230,11 +252,8 @@ else
     esac
 fi
 
-
-    clear
-
-figlet "Installing Debian" 
-echo "$WERSJA on $DYSK"
+dialog --title "Installing Debian" --infobox "Installing Debian $WERSJA on $DYSK..." 8 60
+sleep 2
 
 debootstrap $WERSJA /mnt
 
@@ -431,8 +450,6 @@ while true; do
     esac
 done
 clear
-
-
 
 echo "Installation finished. You can now reboot your system."
 ip -c -br a

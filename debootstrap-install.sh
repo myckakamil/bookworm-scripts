@@ -312,6 +312,9 @@ else
     esac
 fi
 
+# Show progress dialog
+dialog --title "Installing Base System" --infobox "Configuring system settings..." 8 60
+sleep 1
 
 # Generating locales
 chroot /mnt /bin/bash -c "apt-get install -y locales && echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
@@ -343,6 +346,7 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
 
+
 # Installing end enabling DHCP client
 chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
 
@@ -351,9 +355,34 @@ if $FS == "btrfs"; then
 fi
 clear
 
-echo "Change your root password"
-echo "Root password:"
-chroot /mnt /bin/bash -c "passwd"
+dialog --title "Base System Installed" --msgbox "Basic system configuration completed successfully." 8 60
+
+dialog --title "Root Password" --msgbox "You must set the root password for your system." 8 50
+while true; do
+    # Get password
+    password=$(dialog --title "Root Password" --insecure --passwordbox "Enter new root password:" 8 50 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ]; then
+        dialog --title "Error" --msgbox "Password is required. Please try again." 8 40
+        continue
+    fi
+
+    # Confirm password
+    confirm=$(dialog --title "Root Password" --insecure --passwordbox "Confirm root password:" 8 50 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ]; then
+        dialog --title "Error" --msgbox "Password is required. Please try again." 8 40
+        continue
+    fi
+
+    # Check if passwords match
+    if [ "$password" = "$confirm" ]; then
+        echo "root:$password" | chroot /mnt chpasswd
+        dialog --title "Success" --msgbox "Root password has been set successfully." 8 50
+        break
+    else
+        dialog --title "Error" --msgbox "Passwords do not match. Please try again." 8 50
+    fi
+done
+
 clear
 
 while true; do
@@ -392,7 +421,6 @@ while true; do
 done
 clear
 
-# Creating a new user
 echo "Do you want to create a new user?"
 while true; do
     read -p "Create a new user? (yes/no): " USER

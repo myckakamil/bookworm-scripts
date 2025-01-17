@@ -409,17 +409,37 @@ clear
 
 echo "Do you want to create a new user?"
 while true; do
-    read -p "Create a new user? (yes/no): " USER
-    case $USER in
+    read -p "Create a new user? (yes/no): " CREATE_USER
+    case $CREATE_USER in
         yes | y)
             read -p "Enter the full name of the user: " FULLNAME
             read -p "Enter the username: " USERNAME
-            chroot /mnt /bin/bash -c "useradd -m -G users -s /bin/bash -c \"$FULLNAME\" $USERNAME"
+            
+            # Validate username
+            if ! [[ $USERNAME =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+                echo "Invalid username format. Use only lowercase letters, numbers, - and _"
+                continue
+            fi
+            
+            if ! chroot /mnt /bin/bash -c "useradd -m -G users -s /bin/bash -c \"$FULLNAME\" $USERNAME"; then
+                echo "Failed to create user"
+                continue
+            fi
+            
             while true; do
-                read -p "Will $USERNAME be a sudo user? (yes/no): " SUDO
-                case $SUDO in
+                read -p "Will $USERNAME be a sudo user? (yes/no): " SUDO_USER
+                case $SUDO_USER in
                     yes | y)
-                        chroot /mnt /bin/bash -c "usermod -aG sudo $USERNAME"
+                        # Check if sudo is installed
+                        if ! chroot /mnt /bin/bash -c "dpkg -l | grep -q '^ii.*sudo'"; then
+                            echo "Installing sudo package..."
+                            chroot /mnt /bin/bash -c "apt-get install -y sudo"
+                        fi
+                        
+                        if ! chroot /mnt /bin/bash -c "usermod -aG sudo $USERNAME"; then
+                            echo "Failed to add user to sudo group"
+                            continue
+                        fi
                         break
                         ;;
                     no | n)
@@ -430,28 +450,10 @@ while true; do
                         ;;
                 esac
             done
-            echo "User password:"
+            
+            echo "Set user password:"
             chroot /mnt /bin/bash -c "passwd $USERNAME"
             clear
-            while true; do
-                read "Do you want to predownload my setup scripts? (yes/no): " SCRIPTS
-                case $SCRIPTS in
-                    yes | y)
-                        chroot /mnt /bin/bash -c "apt-get install -y git"
-                        chroot /mnt /bin/bash -c "mkdir /home/$USERNAME/"
-                        chroot /mnt /bin/bash -c "git clone https://github.com/Mordimmer/bookwork-scripts /home/$USERNAME/bookwork-scripts"
-                        chroot /mnt /bin/bash -c "chown -R $USERNAME:$USERNAME /home/$USERNAME/bookwork-scripts"
-                        break
-                        ;;
-                    no | n)
-                        echo "No scripts downloaded."
-                        break
-                        ;;
-                    *)
-                        echo "Invalid choice. Please select 'yes' or 'no'."
-                        ;;  
-                esac
-            done
             break
             ;;
         no | n)

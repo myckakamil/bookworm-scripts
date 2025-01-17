@@ -111,35 +111,16 @@ while true; do
     fi
 done
 
-while true; do
-    fs=$(dialog --title "Filesystem Selection" \
-        --menu "Select filesystem to use:" 12 50 4 \
-        "ext4" "Extended Filesystem 4" \
-        "btrfs" "B-Tree Filesystem" \
-        "xfs" "XFS Filesystem (not supported yet)" \
-        "zfs" "ZFS Filesystem (not supported yet)" \
-        3>&1 1>&2 2>&3)
+FS=$(dialog --title "Filesystem Selection" \
+    --menu "Select filesystem to use:" 12 50 2 \
+    "ext4" "Extended Filesystem 4" \
+    "btrfs" "B-Tree Filesystem" \
+    3>&1 1>&2 2>&3)
 
-    if [ $? -ne 0 ]; then
-        clear
-        exit 1
-    fi
-
-    case $fs in
-        "ext4")
-            FS=ext4
-            break
-            ;;
-        "btrfs") 
-            FS=btrfs
-            break
-            ;;
-        "xfs"|"zfs")
-            dialog --title "ERROR" --msgbox "This filesystem is not supported yet." 8 50
-            continue
-            ;;
-    esac
-done
+if [ $? -ne 0 ]; then
+    clear
+    exit 1
+fi
 
 clear
 
@@ -167,7 +148,17 @@ umount "$DYSK"* 2>/dev/null || true
 swapoff "$DYSK"* 2>/dev/null || true
 wipefs -af "$DYSK"
 
+# Define partition variables early
+if [[ "$DYSK" == *"nvme"* ]]; then
+    BOOT_PART="${DYSK}p1"
+    ROOT_PART="${DYSK}p2"
+else
+    BOOT_PART="${DYSK}1"
+    ROOT_PART="${DYSK}2"
+fi
+
 if [ "$BOOT_MODE" == "uefi" ]; then
+    # Create partitions
     parted "$DYSK" --script mklabel gpt \
         mkpart boot fat32 1MiB 1001MiB \
         set 1 esp on \
@@ -176,44 +167,44 @@ if [ "$BOOT_MODE" == "uefi" ]; then
     echo "UEFI boot partition created"
     lsblk "$DYSK"
 
-    echo "Finished partitioning $DYSK."
-
     echo "Formatting partitions..."
-    mkfs.vfat "${DYSK}1" 
+    mkfs.vfat "$BOOT_PART"
 
     case $FS in
         ext4)
-            mkfs.ext4 -F "${DYSK}2"
+            mkfs.ext4 -F "$ROOT_PART"
             echo "Mounting partitions..."
-            mount "${DYSK}2" /mnt
+            mount "$ROOT_PART" /mnt
             mkdir -p /mnt/boot/efi
-            mount "${DYSK}1" /mnt/boot/efi
+            mount "$BOOT_PART" /mnt/boot/efi
             ;;
         btrfs)
-            mkfs.btrfs "${DYSK}2" -f
+            mkfs.btrfs "$ROOT_PART" -f
             echo "Creating subvolumes..."
-            mount "${DYSK}2" /mnt
+            mount "$ROOT_PART" /mnt
             btrfs subvolume create /mnt/@
             btrfs subvolume create /mnt/@home
-            btrfs subvolume create /mnt/@root
             btrfs subvolume create /mnt/@var
             btrfs subvolume create /mnt/@tmp
             btrfs subvolume create /mnt/@snapshots
 
             echo "Mounting subvolumes..."
-            mount -o noatime,compress=zstd,subvol=@ "$DYSK"2 /mnt
-            mkdir -p /mnt/{home,root,var,tmp,.snapshots}
-            mkdir -p /mnt/boot/efi
-            mount -o noatime,compress=zstd,subvol=@home "$DYSK"2 /mnt/home
-            mount -o noatime,compress=zstd,subvol=@var "$DYSK"2 /mnt/var
-            mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"2 /mnt/tmp
-            mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"2 /mnt/.snapshots
-            mount "${DYSK}"1 /mnt/boot/efi
-            ;;
-        *)
+            mount -o noatime,compress=zstd,subvol=@ "$ROOT_PART" /mnt
+            mkdir -p /mnt/{home,var,tmp,.snapshots,boot/efi}
+            mount -o noatime,compress=zstd,subvol=@home "$ROOT_PART" /mnt/home
+            mount -o noatime,compress=zstd,subvol=@var "$ROOT_PART" /mnt/var
+            mount -o noatime,compress=zstd,subvol=@tmp "$ROOT_PART" /mnt/tmp
+            mount -o noatime,compress=zstd,subvol=@snapshots "$ROOT_PART" /mnt/.snapshots
+            mount "$BOOT_PART" /mnt/boot/efi
             ;;
     esac
 else
+    if [[ "$DYSK" == *"nvme"* ]]; then
+        ROOT_PART="${DYSK}p1"
+    else
+        ROOT_PART="${DYSK}1"
+    fi
+    
     # Creating partitions for BIOS
     parted "$DYSK" --script mklabel msdos \
         mkpart primary $FS 1MiB 100% \
@@ -222,32 +213,29 @@ else
     echo "BIOS boot partition created"
     lsblk "$DYSK"
 
-    echo "Finished partitioning $DYSK."
-
     echo "Formatting partitions"
     case $FS in
         ext4)
-            mkfs.ext4 -F "${DYSK}1"
+            mkfs.ext4 -F "$ROOT_PART"
             echo "Mounting partitions..."
-            mount "${DYSK}1" /mnt
+            mount "$ROOT_PART" /mnt
             ;;
         btrfs)
-            mkfs.btrfs "${DYSK}1" -f
+            mkfs.btrfs "$ROOT_PART" -f
             echo "Creating subvolumes..."
-            mount "${DYSK}1" /mnt
+            mount "$ROOT_PART" /mnt
             btrfs subvolume create /mnt/@
             btrfs subvolume create /mnt/@home
-            btrfs subvolume create /mnt/@root
             btrfs subvolume create /mnt/@var
+            btrfs subvolume create /mnt/@tmp
+            btrfs subvolume create /mnt/@snapshots
             echo "Mounting subvolumes..."
-            mount -o noatime,compress=zstd,subvol=@ "$DYSK"1 /mnt
-            mkdir -p /mnt/{home,root,var,tmp,.snapshots}
-            mount -o noatime,compress=zstd,subvol=@home "$DYSK"1 /mnt/home
-            mount -o noatime,compress=zstd,subvol=@var "$DYSK"1 /mnt/var
-            mount -o noatime,compress=zstd,subvol=@tmp "$DYSK"1 /mnt/tmp
-            mount -o noatime,compress=zstd,subvol=@snapshots "$DYSK"1 /mnt/.snapshots
-            ;;
-        *)
+            mount -o noatime,compress=zstd,subvol=@ "$ROOT_PART" /mnt
+            mkdir -p /mnt/{home,var,tmp,.snapshots}
+            mount -o noatime,compress=zstd,subvol=@home "$ROOT_PART" /mnt/home
+            mount -o noatime,compress=zstd,subvol=@var "$ROOT_PART" /mnt/var
+            mount -o noatime,compress=zstd,subvol=@tmp "$ROOT_PART" /mnt/tmp
+            mount -o noatime,compress=zstd,subvol=@snapshots "$ROOT_PART" /mnt/.snapshots
             ;;
     esac
 fi
@@ -276,8 +264,8 @@ else
 fi
 
 if [ "$BOOT_MODE" == "UEFI" ]; then
-    EFI_UUID=$(blkid -s UUID -o value "${DYSK}1")
-    ROOT_UUID=$(blkid -s UUID -o value "${DYSK}2")
+    EFI_UUID=$(blkid -s UUID -o value "$BOOT_PART")
+    ROOT_UUID=$(blkid -s UUID -o value "$ROOT_PART")
 
     case $FS in
         ext4)
@@ -287,7 +275,6 @@ if [ "$BOOT_MODE" == "UEFI" ]; then
         btrfs)
             echo "UUID=$ROOT_UUID /           btrfs noatime,compress=zstd,subvol=@            0 0" > /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /home       btrfs noatime,compress=zstd,subvol=@home        0 0" >> /mnt/etc/fstab
-            echo "UUID=$ROOT_UUID /root       btrfs noatime,compress=zstd,subvol=@root        0 0" >> /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /var        btrfs noatime,compress=zstd,subvol=@var         0 0" >> /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /tmp        btrfs noatime,compress=zstd,subvol=@tmp         0 0" >> /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /.snapshots btrfs noatime,compress=zstd,subvol=@snapshots   0 0" >> /mnt/etc/fstab
@@ -304,7 +291,6 @@ else
         btrfs)
             echo "UUID=$ROOT_UUID /           btrfs noatime,compress=zstd,subvol=@            0 0" > /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /home       btrfs noatime,compress=zstd,subvol=@home        0 0" >> /mnt/etc/fstab
-            echo "UUID=$ROOT_UUID /root       btrfs noatime,compress=zstd,subvol=@root        0 0" >> /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /var        btrfs noatime,compress=zstd,subvol=@var         0 0" >> /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /tmp        btrfs noatime,compress=zstd,subvol=@tmp         0 0" >> /mnt/etc/fstab
             echo "UUID=$ROOT_UUID /.snapshots btrfs noatime,compress=zstd,subvol=@snapshots   0 0" >> /mnt/etc/fstab

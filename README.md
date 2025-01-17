@@ -34,9 +34,11 @@ sudo ./setup.sh
 - [ ] Code optimizations
 - [ ] RAID
 - [ ] TUI
+- [ ] Selecting keyboard layout
+- [ ] Selecting timezone
+- [ ] Selecting recommended packages
+- [ ] Installing desktop environment
+
 
 ## setup.sh
-- [ ] Create DWM installer
-- [ ] Create dotfiles installation script
-- [ ] Run asterisk installer
 - [ ] Ansible automation

@@ -19,9 +19,9 @@ fi
 
 # check uefi/bios
 if [ -d /sys/firmware/efi ]; then
-    BOOT_MODE=uefi
+    BOOT_MODE=UEFI
 else
-    BOOT_MODE=bios
+    BOOT_MODE=BIOS
 fi
 
 # check internet connection
@@ -54,7 +54,7 @@ fi
 
 clear
 # get hostname
-hostname=$(dialog --title "hostname" \
+HOSTNAME=$(dialog --title "hostname" \
     --inputbox "enter the hostname for your computer:" 8 50 \
     3>&1 1>&2 2>&3)
 
@@ -147,6 +147,7 @@ sleep 1
 umount "$DYSK"* 2>/dev/null || true
 swapoff "$DYSK"* 2>/dev/null || true
 wipefs -af "$DYSK"
+partprobe "$DYSK"
 
 # Define partition variables early
 if [[ "$DYSK" == *"nvme"* ]]; then
@@ -157,7 +158,7 @@ else
     ROOT_PART="${DYSK}2"
 fi
 
-if [ "$BOOT_MODE" == "uefi" ]; then
+if [ "$BOOT_MODE" == "UEFI" ]; then
     # Create partitions
     parted "$DYSK" --script mklabel gpt \
         mkpart boot fat32 1MiB 1001MiB \

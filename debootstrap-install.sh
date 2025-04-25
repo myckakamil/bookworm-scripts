@@ -319,9 +319,6 @@ chroot /mnt /bin/bash -c "sed -i 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\
 cat <<EOF > /mnt/etc/network/interfaces
 auto lo
 iface lo inet loopback
-
-auto eth0
-iface eth0 inet dhcp
 EOF
 
 # Setting up hostname
@@ -334,9 +331,11 @@ ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
 
-
 # Installing end enabling DHCP client
 chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd" 
+
+# Installing firmware
+chroot /mnt /bin/bash -c "apt-get install -y firmware-iwlwifi firmware-realtek" 
 
 if $FS == "btrfs"; then
     chroot /mnt /bin/bash -c "apt-get install -y btrfs-progs"

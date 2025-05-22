@@ -36,6 +36,8 @@ apt update && apt full-upgrade -y
 apt install proxmox-default-kernel -y
 apt install proxmox-ve postfix open-iscsi chrony -y
 apt remove linux-image-amd64 'linux-image-6.1*' -y
+sed -i 's/^/#/' /etc/apt/sources.list.d/pve-enterprise.list
+
 update-grub
 apt remove os-prober -y
 

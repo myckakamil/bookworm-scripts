@@ -37,3 +37,17 @@ Services Deployment Scripts
 - `services/nextcloud.sh` - Nextcloud instance deployment with basic configuration
 - `services/opensips.sh` - OpenSIPS SIP server installation
 - `services/proxmox.sh` - Proxmox VE virtualization environment setup
+
+## Development Roadmap
+### Debootstrap
+- ZFS
+- XFS
+- BTRFS (fix issues)
+- RAID configuration
+- LUKS encryption
+- Interactive locale settings
+- Desktop enviroment options
+
+### Services
+- Create TUI and checks for proxmox install
+- Fix bugs in opensips and GNU Gk scripts

@@ -48,6 +48,14 @@ Group=gnugk
 WantedBy=multi-user.target
 EOF
 
+cat >> /etc/gnugk/gnugk.ini << EOF
+[Gatekeeper::Main]
+[GkStatus::Auth]
+rule=allow
+EOF
+
 systemctl daemon-reload 
 systemctl enable gnugk
 systemctl start gnugk
+systemctl status gnugk
+

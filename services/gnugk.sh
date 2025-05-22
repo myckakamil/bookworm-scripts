@@ -1,17 +1,17 @@
 apt update
-apt install -y build-essential cmake libssl-dev libexpat1-dev libpcre3-dev libx11-dev libasound2-dev libv4l-dev libssl-dev flex bison autoconf
+apt install -y build-essential cmake libssl-dev libexpat1-dev libpcre3-dev libx11-dev libasound2-dev libv4l-dev libssl-dev flex bison autoconf pkg-config
 
 git clone https://github.com/willamowius/ptlib.git
 cd ptlib
 ./configure --prefix=/usr/local
-make
+make -j2
 make install
 cd ..
 
 git clone https://github.com/willamowius/h323plus.git
 cd h323plus
 ./configure --prefix=/usr/local --with-ptlib=/usr/local
-make
+make -j2
 make install
 cd ..
 
@@ -19,7 +19,7 @@ cd ..
 git clone https://github.com/willamowius/gnugk
 cd gnugk
 ./configure
-make
+make -j2
 make install
 
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH

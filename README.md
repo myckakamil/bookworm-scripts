@@ -30,7 +30,6 @@ Core Installer
 - `debootstrap-install.sh` - Primary script for base Debian system installation using debootstrap
 Application Scripts
 - `applications/neovim.sh` - Installing latest version of Neovim on Debian
-Services Deployment Scripts
 - `services/asterisk.sh` - Full Asterisk PBX system instalation, with lua dialplan
 - `services/bookstack.sh` - BookStack wiki/documentation platform instalation
 - `services/gnugk.sh` - GNU Gatekeeper instalation for H.323 VoIP networks

@@ -1,10 +1,58 @@
 #!/bin/bash
 
-DOMENA="test.mycka.net"
-HOSTNAME="proxmox"
-INTERFACE=ens18
+while true; do
+read -p "Would you like to change your currnet hostname $HOSTNAME? (y/n)" CONFIRM
+    case $CONFIRM in
+        yes | y)
+            read -p "New hostname: " HOSTNAME
+            break
+            ;;
+        no | n)
+            echo "Hostname not changed"
+            break
+            ;;
+        *)
+            echo "Invalid choice. Please select 'yes' or 'no'."
+            ;;
+    esac
+done
+
+while true; do
+    read -p "Provide your domain: " DOMAIN 
+    read -p "Are you sure? $DOMAIN: (y/n)" CONFIRM
+    case $CONFIRM in
+        yes | y)
+            break
+            ;;
+        no | n)
+            ;;
+        *)
+            echo "Invalid choice. Please select 'yes' or 'no'."
+            ;;
+    esac
+done
+
+FQDN="${HOSTNAME}.${DOMAIN}"
+
+INTERFACES=($(ip -o link show | awk -F': ' '{print $2}' | grep -v lo))
+
+if [ ${#interfaces[@]} -eq 0 ]; then
+    echo "No network interfaces found. Exiting."
+    exit 1
+fi
+
+echo "Available network interfaces:"
+PS3="Select interface for internet access: "
+select INTERFACE in "${INTERFACES[@]}"; do
+    if [[ -n "$INTERFACE" ]]; then
+        break
+    else
+        echo "Invalid selection. Please choose a valid number."
+    fi
+done
+
 IP=$(ip -o -4 a s | grep $INTERFACE | awk '{print $4}' | cut -d/ -f1)
-FQDN="${HOSTNAME}.${DOMENA}"
+
 
 echo $HOSTNAME > /etc/hostname
 

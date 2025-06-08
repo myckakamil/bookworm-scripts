@@ -36,7 +36,7 @@ FQDN="${HOSTNAME}.${DOMAIN}"
 
 INTERFACES=($(ip -o link show | awk -F': ' '{print $2}' | grep -v lo))
 
-if [ ${#interfaces[@]} -eq 0 ]; then
+if [ ${#INTERFACES[@]} -eq 0 ]; then
     echo "No network interfaces found. Exiting."
     exit 1
 fi

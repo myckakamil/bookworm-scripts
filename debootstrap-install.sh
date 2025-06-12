@@ -76,8 +76,8 @@ fi
 WERSJA=$(dialog --title "debian version" \
     --menu "select debian version to install:" 12 50 3 \
     "stable" "debian stable (recommended)" \
-    "testing" "debian testing (not tested)" \
-    "sid" "debian sid (not tested)" \
+    "testing" "debian testing" \
+    "sid" "debian sid" \
     3>&1 1>&2 2>&3)
 
 if [ $? -ne 0 ]; then

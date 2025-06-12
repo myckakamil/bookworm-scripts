@@ -304,7 +304,12 @@ dialog --title "Installing Base System" --infobox "Configuring system settings..
 sleep 1
 
 # Generating locales
-chroot /mnt /bin/bash -c "apt-get install -y locales && echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
+chroot /mnt /bin/bash -c "apt-get install -y locales"
+echo "en_US.UTF-8 UTF-8" > /mnt/etc/locale.gen
+chroot /mnt /bin/bash -c "locale-gen"
+echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
+echo "LANG=en_US.UTF-8" > /mnt/etc/default/locale
+chroot /mnt /bin/bash -c "update-locale LANG=en_US.UTF-8"
 
 # Setting up timezone
 chroot /mnt /bin/bash -c "ln -sf /usr/share/zoneinfo/Europe/Warsaw /etc/localtime"
@@ -337,7 +342,7 @@ chroot /mnt /bin/bash -c "apt-get install -y dhcpcd && systemctl enable dhcpcd"
 # Installing firmware
 chroot /mnt /bin/bash -c "apt-get install -y firmware-iwlwifi firmware-realtek" 
 
-if $FS == "btrfs"; then
+if [ $FS == "btrfs" ]; then
     chroot /mnt /bin/bash -c "apt-get install -y btrfs-progs"
 fi
 clear

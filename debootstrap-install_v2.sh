@@ -77,10 +77,17 @@ chose_filesystem(){
 root_password(){
     # ROOT PASSWORD
     while true; do
-        ROOT_PASSWORD=$(whiptail --title "Root password" \
-            --passwordbox "Please provide your root password:" 10 70 \
-            3>&1 1>&2 2>&3)
-        cancel $?
+        while true; do
+            ROOT_PASSWORD=$(whiptail --title "Root password" \
+                --passwordbox "Please provide your root password:" 10 70 \
+                3>&1 1>&2 2>&3)
+            cancel $?
+            if [ -n "$ROOT_PASSWORD" ]; then
+                break
+            else
+                whiptail --msgbox "Password can't be empty" 8 40
+            fi
+        done
         ROOT_PASSWORD_CONFIRM=$(whiptail --title "Confirm root password" \
             --passwordbox "Please confirm your root password:" 10 70 \
             3>&1 1>&2 2>&3)
@@ -95,10 +102,17 @@ root_password(){
 }
 
 create_user(){
+    while true; do
         USER_LOGIN=$(whiptail --title "Login" \
             --inputbox "Please provide a username:" 8 40 \
             3>&1 1>&2 2>&3)
         cancel $?
+        if [ -n "$USER_LOGIN" ]; then
+            break
+        else
+            whiptail --msgbox "Username can't be empty" 8 40
+        fi
+    done
         
         USER_NAME_FULL=$(whiptail --title "Full name" \
             --inputbox "Please provide the user's full name:" 8 40 \
@@ -107,10 +121,17 @@ create_user(){
         
         # New user password
         while true; do
-            USER_PASSWORD=$(whiptail --title "User password" \
-                --passwordbox "Please provide password for the new user:" 10 70 \
-                3>&1 1>&2 2>&3)
-            cancel $?
+            while true; do
+                USER_PASSWORD=$(whiptail --title "User password" \
+                    --passwordbox "Please provide password for the new user:" 10 70 \
+                    3>&1 1>&2 2>&3)
+                cancel $?
+                if [ -n "$USER_PASSWORD" ]; then
+                    break
+                else
+                    whiptail --msgbox "Password can't be empty" 8 40
+                fi
+            done
             
             USER_PASSWORD_CONFIRM=$(whiptail --title "Confirm user password" \
                 --passwordbox "Please confirm the user password:" 10 70 \
@@ -146,7 +167,7 @@ ssh_options(){
         fi
 
         # Ask to upload my public key
-        if whiptail --title "Public key" --yesno "Do you want to add the public key from the script?\n\n$PUBLIC_KEY" 12 70; then
+        if whiptail --title "Public key" --yesno "Do you want to add the public key from the script?\n\n$PUBLIC_KEY" 12 80; then
             SSH_PUBLIC_KEY=yes
         else
             SSH_PUBLIC_KEY=no
@@ -158,8 +179,15 @@ ssh_options(){
 
 while true; do
     # Input hostname
-    HOSTNAME=$(whiptail --title "Hostname" --inputbox "Enter hostname for the computer: " 8 40 3>&1 1>&2 2>&3)
-    cancel $?
+    while true; do
+        HOSTNAME=$(whiptail --title "Hostname" --inputbox "Enter hostname for the computer: " 8 40 3>&1 1>&2 2>&3)
+        cancel $?
+        if [ -n "$HOSTNAME" ]; then
+            break
+        else
+            whiptail --msgbox "Hostname can't be empty" 8 40
+        fi
+    done
 
     debian_version
     chose_disk
@@ -200,11 +228,10 @@ while true; do
     fi
 
     if whiptail --title "Final confirmation" \
-        --yesno "This is the final step. Are you sure you want to continue?\n\n$SUMMARY" 30 60; then
+        --yesno "This is the final step. Are you sure you want to continue instalation with this parameters?\n\n$SUMMARY" 30 80; then
         break
     fi
-
 done
 
-whiptail --msgbox "Everything worked so far, installing system" 10 60
+whiptail --msgbox "Everything worked so far, installing and configuring system" 10 60
 clear

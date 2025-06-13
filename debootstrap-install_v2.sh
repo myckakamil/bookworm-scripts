@@ -1,4 +1,4 @@
-#!/bin/bash
+#!bin/bash
 # Global variables
 PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJF3mRlmUdCwWujN49vBX6n1Cmp1CwEtqsYZf8eUftzt km"
 
@@ -193,11 +193,9 @@ while true; do
     chose_disk
     chose_filesystem
     root_password
-
     if whiptail --title "New user" --yesno "Do you want to create a new user?" 8 40; then
         create_user
     fi
-
     ssh_options
 
     # Summary
@@ -234,4 +232,71 @@ while true; do
 done
 
 whiptail --msgbox "Everything worked so far, installing and configuring system" 10 60
+
+#DEV 
+SELECTED_DISK="/dev/vdb"
+
+echo "=== CREATING PARTITIONS ==="
+umount "$SELECTED_DISK" 1>/dev/null
+swapoff "$SELECTED_DISK" 1>/dev/null
+wipefs -af "$SELECTED_DISK"
+
+
+if [ "$BOOT_MODE" == "UEFI" ]; then
+    if [[ "$SELECTED_DISK" == *"nvme" ]]; then
+        BOOT_PARTITION="${SELECTED_DISK}p1"
+        ROOT_PARTITION="${SELECTED_DISK}p2"
+    else
+        BOOT_PARTITION="${SELECTED_DISK}1"
+        ROOT_PARTITION="${SELECTED_DISK}2"
+    fi
+
+    echo -e 'label: gpt\nstart=1MiB,size=1GiB,type=uefi\nsize=+,type=Linux\n' | sfdisk "$SELECTED_DISK"
+
+    mkfs.vfat "$BOOT_PARTITION" 
+
+elif [ "$BOOT_MODE" == "BIOS" ]; then
+    if [[ "$DYSK" == *"nvme"* ]]; then
+        ROOT_PART="${DYSK}p1"
+    else
+        ROOT_PART="${DYSK}1"
+    fi
+
+    echo -e 'label: dos\nsize=+,type=Linux,bootable\n' | sfdisk "$SELECTED_DISK"
+
+    case $FS in
+        ext4)
+            mkfs.ext4 -F "$ROOT_PART"
+            echo "Mounting partitions..."
+            mount "$ROOT_PART" /mnt
+            ;;
+        btrfs)
+            mkfs.btrfs "$ROOT_PART" -f
+            echo "Creating subvolumes..."
+            mount "$ROOT_PART" /mnt
+            btrfs subvolume create /mnt/@
+            btrfs subvolume create /mnt/@home
+            btrfs subvolume create /mnt/@var
+            btrfs subvolume create /mnt/@tmp
+            btrfs subvolume create /mnt/@snapshots
+            echo "Mounting subvolumes..."
+            mount -o noatime,compress=zstd,subvol=@ "$ROOT_PART" /mnt
+            mkdir -p /mnt/{home,var,tmp,.snapshots}
+            mount -o noatime,compress=zstd,subvol=@home "$ROOT_PART" /mnt/home
+            mount -o noatime,compress=zstd,subvol=@var "$ROOT_PART" /mnt/var
+            mount -o noatime,compress=zstd,subvol=@tmp "$ROOT_PART" /mnt/tmp
+            mount -o noatime,compress=zstd,subvol=@snapshots "$ROOT_PART" /mnt/.snapshots
+            ;;
+    esac
+
+    debootstrap $VERSION /mnt
+
+else
+    echo "Wrong boot type"
+fi
+
+echo "=== PARTITIONS CREATED ==="
+
 clear
+
+

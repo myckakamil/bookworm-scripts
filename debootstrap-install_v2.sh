@@ -1,5 +1,5 @@
 #!/bin/bash
-# GLOBAL VARIABLES
+# Global variables
 PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJF3mRlmUdCwWujN49vBX6n1Cmp1CwEtqsYZf8eUftzt km"
 
 cancel(){
@@ -8,11 +8,6 @@ cancel(){
         exit 1
     fi
 }
-
-if ! command -v dialog >/dev/null 2>&1; then
-    apt-get update
-    apt-get install -y dialog
-fi
 
 if [ $(id -u) -ne 0 ]; then
     whiptail --title "Error" --msgbox "Please run this script as root." 8 40
@@ -37,14 +32,10 @@ fi
 whiptail --title "Warning" --yesno "This script will erase all data on the selected disk. Do you want to continue?" --yes-button "Continue" --no-button "Exit" 8 60
 cancel $?
 
-dialog --title "System update" --msgbox "Updating system and installing required packages" 8 50
+dialog --title "System update" --infobox "Updating system and installing required packages" 8 50
 apt-get update && apt-get install debootstrap parted -y
 
-while true; do
-    # Input hostname
-    HOSTNAME=$(whiptail --title "Hostname" --inputbox "Enter hostname for the computer: " 8 40 3>&1 1>&2 2>&3)
-    cancel $?
-
+debian_version(){
     # Select Debian release
     VERSION=$(whiptail --title "Debian version" \
         --menu "Choose a Debian release to install:" 12 40 4 \
@@ -53,7 +44,9 @@ while true; do
         "sid" "Debian unstable" \
         3>&1 1>&2 2>&3)
     cancel $?
+}
 
+chose_disk(){
     # Write all physical disks to DISK_OPTIONS array
     unset DISK_OPTIONS
     declare -a DISK_OPTIONS
@@ -69,7 +62,9 @@ while true; do
         "${DISK_OPTIONS[@]}" \
         3>&1 1>&2 2>&3)
     cancel $?
+}
 
+chose_filesystem(){
     # Select filesystem
     FS=$(whiptail --title "Filesystem selection" \
         --menu "Select filesystem for your partition:" 12 50 4 \
@@ -77,7 +72,9 @@ while true; do
         "btrfs" "B-Tree Filesystem" \
         3>&1 1>&2 2>&3)
     cancel $?
+}
 
+root_password(){
     # ROOT PASSWORD
     while true; do
         ROOT_PASSWORD=$(whiptail --title "Root password" \
@@ -95,11 +92,9 @@ while true; do
             whiptail --title "Mismatch" --msgbox "You provided two different passwords. Please enter them again" 10 70
         fi
     done   
+}
 
-    # New user
-    if whiptail --title "New user" --yesno "Do you want to create a new user?" 8 40; then
-        USER_CREATE=yes
-
+create_user(){
         USER_LOGIN=$(whiptail --title "Login" \
             --inputbox "Please provide a username:" 8 40 \
             3>&1 1>&2 2>&3)
@@ -135,10 +130,9 @@ while true; do
         else
             USER_SUDO=no
         fi
-    else
-        USER_CREATE=no
-    fi
+}
 
+ssh_options(){
     # SSH section
     # Enabling SSH
     if whiptail --title "SSH" --yesno "Do you want to install and enable SSH?" 8 40; then
@@ -160,10 +154,57 @@ while true; do
     else
         SSH_ENABLE=no
     fi
+}
 
-    # FINAL CONFIRMATION
-    whiptail --title "Final confirmation" --yesno "This is the final step. Are you sure you want to continue?" 10 60
+while true; do
+    # Input hostname
+    HOSTNAME=$(whiptail --title "Hostname" --inputbox "Enter hostname for the computer: " 8 40 3>&1 1>&2 2>&3)
     cancel $?
 
-    break
+    debian_version
+    chose_disk
+    chose_filesystem
+    root_password
+
+    if whiptail --title "New user" --yesno "Do you want to create a new user?" 8 40; then
+        create_user
+    fi
+
+    ssh_options
+
+    # Summary
+    declare -a SUMMARY
+    SUMMARY+="INSTALATION SUMMARY\n"
+    SUMMARY+="Hostname: $HOSTNAME\n"
+    SUMMARY+="Debian release: $VERSION\n"
+    SUMMARY+="Disk: $SELECTED_DISK\n"
+    SUMMARY+="Filesystem $FS\n\n"
+
+    if [ -n "$USER_LOGIN" ]; then
+        SUMMARY+="New User Account:\n"
+        SUMMARY+="  Username: $USER_LOGIN\n"
+        SUMMARY+="  Full Name: $USER_NAME_FULL\n"
+        SUMMARY+="  Sudo Privileges: $USER_SUDO\n\n"
+    else
+        SUMMARY+="New User Account: Not created\n\n"
+    fi
+
+    SUMMARY+="SSH Configuration:\n"
+    SUMMARY+="  SSH Enabled: $SSH_ENABLE\n"
+    if [ "$SSH_ENABLE" = "yes" ]; then
+        SUMMARY+="  Root Login with Password: $SSH_ROOT_PASSWORD\n"
+        SUMMARY+="  Public Key Added: $SSH_PUBLIC_KEY\n"
+        if [ "$SSH_PUBLIC_KEY" = "yes" ]; then
+            SUMMARY+="  Public Key: $PUBLIC_KEY\n"
+        fi
+    fi
+
+    if whiptail --title "Final confirmation" \
+        --yesno "This is the final step. Are you sure you want to continue?\n\n$SUMMARY" 30 60; then
+        break
+    fi
+
 done
+
+whiptail --msgbox "Everything worked so far, installing system" 10 60
+clear

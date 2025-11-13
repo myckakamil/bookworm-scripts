@@ -1,8 +1,8 @@
 # Bookworm scripts
 
 > **Note**  
-> This project is currently in maintenance mode. Since I started this repo, I discovered **Ansible** 😄  
-> The `debootstrap` script will be moved to its own repository in the future.
+> This project is currently in maintenance mode. Since I started this repo, I’ve discovered Ansible and migrated most scripts to it 😄
+> The `debootstrap` script will eventually be moved to its own repository.
 
 A collection of automated scripts for installing and configuring Debian systems. Ideal for quickly setting up new installations with various configurations.
 

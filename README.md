@@ -38,7 +38,3 @@ Application Scripts
 - `services/opensips.sh` - OpenSIPS SIP server installation
 - `services/proxmox.sh` - Proxmox VE virtualization environment setup
 
-
-### Services
-- Create TUI and checks for proxmox install
-- Fix bugs in opensips and GNU Gk scripts

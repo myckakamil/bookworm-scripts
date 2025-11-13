@@ -1,7 +1,8 @@
 # Bookworm scripts
 
 > **Note**  
-> This project is still a work in progress. Expect frequent updates and breaking changes.
+> This project is currently in maintenance mode. Since I started this repo, I discovered **Ansible** 😄  
+> The `debootstrap` script will be moved to its own repository in the future.
 
 A collection of automated scripts for installing and configuring Debian systems. Ideal for quickly setting up new installations with various configurations.
 
@@ -17,11 +18,11 @@ Installing Debian using debootstrap
 1. Clone the repository (recommended location):
     ```bash
     mkdir -p ~/Git && cd ~/Git
-    git clone https://github.com/myckakamil/bookwork-scripts
+    git clone https://github.com/myckakamil/bookworm-scripts
     ```
 2. Run the installation script:
     ```bash
-    cd bookwork-scripts
+    cd bookworm-scripts
     chmod +x debootstrap-install.sh
     sudo ./debootstrap-install.sh
     ```
@@ -30,22 +31,13 @@ Core Installer
 - `debootstrap-install.sh` - Primary script for base Debian system installation using debootstrap
 Application Scripts
 - `applications/neovim.sh` - Installing latest version of Neovim on Debian
-- `services/asterisk.sh` - Full Asterisk PBX system instalation, with lua dialplan
-- `services/bookstack.sh` - BookStack wiki/documentation platform instalation
-- `services/gnugk.sh` - GNU Gatekeeper instalation for H.323 VoIP networks
+- `services/asterisk.sh` - Full Asterisk PBX system installation, with lua dialplan
+- `services/bookstack.sh` - BookStack wiki/documentation platform installation
+- `services/gnugk.sh` - GNU Gatekeeper installation for H.323 VoIP networks
 - `services/nextcloud.sh` - Nextcloud instance deployment with basic configuration
 - `services/opensips.sh` - OpenSIPS SIP server installation
 - `services/proxmox.sh` - Proxmox VE virtualization environment setup
 
-## Development Roadmap
-### Debootstrap
-- ZFS
-- XFS
-- BTRFS (fix issues)
-- RAID configuration
-- LUKS encryption
-- Interactive locale settings
-- Desktop enviroment options
 
 ### Services
 - Create TUI and checks for proxmox install
